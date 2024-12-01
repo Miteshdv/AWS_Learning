@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            background-color: #fff;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Express Server</h1>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" id="fileInput" required>
+        <button type="submit">Upload to S3</button>
+    </form>
+    <form id="dataForm">
+        <input type="text" name="id" id="idInput" placeholder="Enter ID" required>
+        <button type="submit">Get Data from DynamoDB</button>
+    </form>
+    <ul id="messageList"></ul>
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const dataForm = document.getElementById('dataForm');
+        const messageList = document.getElementById('messageList');
+
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(uploadForm);
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.text();
+            alert(result);
+        });
+
+        dataForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const id = document.getElementById('idInput').value;
+            const response = await fetch(`/data?id=${id}`);
+            const data = await response.json();
+            alert(JSON.stringify(data, null, 2));
+        });
+
+        const ws = new WebSocket(`ws://${window.location.host}`);
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            const listItem = document.createElement('li');
+            listItem.textContent = JSON.stringify(message, null, 2);
+            messageList.appendChild(listItem);
+        };
+    </script>
+</body>
+
+</html>

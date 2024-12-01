@@ -1,15 +1,20 @@
 #!/bin/bash
 sudo apt-get update
-sudo apt-get install -y nodejs npm
+
+# Install the latest version of Node.js and npm from NodeSource
+curl -fsSL https://deb.nodesource.com/setup_current.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PM2 globally
 sudo npm install -g pm2
 
 # Set environment variables
-echo "export SQS_URL=${sqs_url}" >> /home/ubuntu/.bashrc
+echo "export SNS_TOPIC_ARN=${sns_topic_arn}" >> /home/ubuntu/.bashrc
 echo "export AWS_ACCESS_KEY_ID=${aws_access_key}" >> /home/ubuntu/.bashrc
 echo "export AWS_SECRET_ACCESS_KEY=${aws_secret_key}" >> /home/ubuntu/.bashrc
 
 # Log environment variables
-echo "SQS_URL=${sqs_url}"
+echo "SNS_TOPIC_ARN=${sns_topic_arn}"
 echo "AWS_ACCESS_KEY_ID=${aws_access_key}"
 echo "AWS_SECRET_ACCESS_KEY=${aws_secret_key}"
 
@@ -18,13 +23,17 @@ cat << 'EOL' > /home/ubuntu/server.js
 ${server_js_content}
 EOL
 
+# Create the HTML file
+cat << 'EOL' > /home/ubuntu/index.html
+${index_html_content}
+EOL
+
 # Change to the home directory
 cd /home/ubuntu
 
 # Initialize a new Node.js project and install dependencies
 npm init -y
-npm install
-npm install express aws-sdk
+npm install express aws-sdk multer axios ws
 
 # Stop any existing processes using port 3000 and 3001
 sudo fuser -k 3000/tcp
@@ -34,7 +43,7 @@ sudo fuser -k 3001/tcp
 pm2 delete all
 
 # Start the Express server using PM2
-pm2 start server.js --name server
+pm2 start /home/ubuntu/server.js --name server
 
 # Wait for a few seconds to allow the server to start
 sleep 10

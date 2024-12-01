@@ -19,7 +19,7 @@ resource "aws_lambda_function" "address-info_lambda" {
   environment {
     variables = {
       DYNAMODB_TABLE = var.dynamodb_table_name
-      SQS_QUEUE_URL  = var.sqs_queue_url
+      SNS_TOPIC_ARN  = var.sns_topic_arn
     }
   }
 }
@@ -31,3 +31,5 @@ resource "aws_lambda_permission" "allow_s3" {
   principal     = "s3.amazonaws.com"
   source_arn    = var.s3_bucket_arn
 }
+
+
