@@ -3,15 +3,14 @@ import boto3
 import csv
 import os
 
-# Initialize S3 and DynamoDB clients
+# Initialize S3, DynamoDB, and SNS clients
 s3_client = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
-sqs_client = boto3.client('sqs')
+sns_client = boto3.client('sns')
 
-# Get the DynamoDB table name from environment variables
+# Get the DynamoDB table name and SNS topic ARN from environment variables
 table_name = os.environ['DYNAMODB_TABLE']
-
-sqs_queue_url = os.environ['SQS_QUEUE_URL']
+sns_topic_arn = os.environ['SNS_TOPIC_ARN']
 
 def lambda_handler(event, context):
     # Log the received event
@@ -44,10 +43,10 @@ def lambda_handler(event, context):
         print(f"Inserting row: {row}")
         table.put_item(Item=row)
 
-    # Notify via SQS that the update is complete
-    sqs_client.send_message(
-        QueueUrl=sqs_queue_url,
-        MessageBody=json.dumps({
+    # Notify via SNS that the update is complete
+    sns_client.publish(
+        TopicArn=sns_topic_arn,
+        Message=json.dumps({
             'message': 'DynamoDB update is complete',
             'bucket_name': bucket_name,
             'object_key': object_key

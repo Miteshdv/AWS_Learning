@@ -33,3 +33,14 @@ variable "vpc_id" {
   description = "The VPC ID where the EC2 instance will be launched"
   type        = string
 }
+
+
+variable "subnet_id" {
+  description = "The Subnet ID where the EC2 instance will be launched"
+  type        = string
+}
+
+variable "associate_public_ip_address" {
+  description = "Whether to associate a public IP address with the instance"
+  type        = bool
+}

@@ -17,16 +17,36 @@ provider "aws" {
   secret_key = var.aws_secret_key
 }
 
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnet" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+  filter {
+    name   = "availability-zone"
+    values = ["us-west-2a"] # Replace with your desired availability zone
+  }
+  filter {
+    name   = "default-for-az"
+    values = ["true"]
+  }
+}
+
 # S3 module configuration.
 module "s3" {
   source = "./modules/s3"
 }
 
-module "sqs" {
-  source = "./modules/sqs"
-  name   = "address-info-sqs-queue"
-}
 
+module "sns" {
+  source = "./modules/sns"
+  name   = "address-info-sns-topic"
+
+}
 
 
 # DynamoDB module configuration with table name, hash key, and environment.
@@ -44,15 +64,38 @@ module "lambda" {
   s3_bucket_arn       = module.s3.bucket_arn
   iam_role_arn        = module.iam.lambda_exec_role_arn
   dynamodb_table_name = module.dynamodb.dynamodb_table_name
-  sqs_queue_url       = module.sqs.url
+  sns_topic_arn       = module.sns.arn
 }
+
+
 
 # IAM module configuration, passing S3 bucket ARN and DynamoDB table ARN.
 module "iam" {
   source             = "./modules/iam"
   s3_bucket_arn      = module.s3.bucket_arn
   dynamodb_table_arn = module.dynamodb.dynamodb_table_arn
-  sqs_queue_arn      = module.sqs.arn
+  sns_topic_arn      = module.sns.arn
+}
+
+module "ec2" {
+  source               = "./modules/ec2"
+  ami                  = "ami-02868af3c3df4b3aa" # Replace with your desired AMI
+  instance_type        = "t2.micro"
+  key_name             = var.key_name
+  instance_name        = "ExpressServer"
+  iam_instance_profile = module.iam.instance_profile_name
+  user_data = templatefile("server-user-data.sh.tpl", {
+    sns_topic_arn       = module.sns.arn,
+    aws_access_key      = var.aws_access_key,
+    aws_secret_key      = var.aws_secret_key,
+    s3_bucket_name      = module.s3.bucket_name,
+    dynamodb_table_name = module.dynamodb.dynamodb_table_name,
+    server_js_content   = file("${path.module}/server.js"),
+    index_html_content  = file("${path.module}/index.html")
+  })
+  vpc_id                      = data.aws_vpc.default.id
+  subnet_id                   = data.aws_subnet.default.id
+  associate_public_ip_address = true
 }
 
 
@@ -68,3 +111,11 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 
   depends_on = [module.lambda]
 }
+
+resource "aws_sns_topic_subscription" "http_subscription" {
+  topic_arn  = module.sns.arn
+  protocol   = "http"
+  endpoint   = "http://${module.ec2.public_ip}:3001/sns"
+  depends_on = [module.ec2]
+}
+
