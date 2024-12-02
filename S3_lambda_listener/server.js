@@ -174,6 +174,23 @@ app.get('/data', (req, res) => {
     });
 });
 
+// API route to get all data from DynamoDB
+app.get('/all-data', (req, res) => {
+    const params = {
+        TableName: tableName,
+    };
+
+    dynamodb.scan(params, (err, data) => {
+        if (err) {
+            console.error('Error scanning DynamoDB table', err);
+            res.status(500).send(`Error scanning DynamoDB table: ${JSON.stringify(err)}`);
+        } else {
+            console.log('All data retrieved successfully', data);
+            res.status(200).json(data.Items);
+        }
+    });
+});
+
 // Test route to post a message to the SNS topic
 app.post('/publish-sns', (req, res) => {
     const message = req.body.message || 'Test message';

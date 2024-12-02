@@ -4,22 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Express Server</title>
+    <title>Address Info</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
+            padding: 20px;
             background-color: #f0f0f0;
         }
 
         h1 {
             color: #333;
+            position: absolute;
+            top: 20px;
+            left: 20px;
         }
 
         form {
@@ -42,11 +40,52 @@
             border: 1px solid #ddd;
             border-radius: 4px;
         }
+
+        #dataDisplay {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            width: 80%;
+            max-width: 600px;
+            word-wrap: break-word;
+        }
+
+        .data-item {
+            margin-bottom: 10px;
+        }
+
+        .data-item label {
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Express Server</h1>
+    <h1>Address Info</h1>
     <form id="uploadForm" enctype="multipart/form-data">
         <input type="file" name="file" id="fileInput" required>
         <button type="submit">Upload to S3</button>
@@ -55,11 +94,14 @@
         <input type="text" name="id" id="idInput" placeholder="Enter ID" required>
         <button type="submit">Get Data from DynamoDB</button>
     </form>
+    <h2>Form Data</h2>
+    <div id="dataDisplay"></div>
     <ul id="messageList"></ul>
     <script>
         const uploadForm = document.getElementById('uploadForm');
         const dataForm = document.getElementById('dataForm');
         const messageList = document.getElementById('messageList');
+        const dataDisplay = document.getElementById('dataDisplay');
 
         uploadForm.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -77,16 +119,60 @@
             const id = document.getElementById('idInput').value;
             const response = await fetch(`/data?id=${id}`);
             const data = await response.json();
-            alert(JSON.stringify(data, null, 2));
+            displayData(data);
         });
 
         const ws = new WebSocket(`ws://${window.location.host}`);
-        ws.onmessage = (event) => {
+        ws.onmessage = async (event) => {
             const message = JSON.parse(event.data);
             const listItem = document.createElement('li');
             listItem.textContent = JSON.stringify(message, null, 2);
             messageList.appendChild(listItem);
+
+            // Fetch all data from DynamoDB
+            const response = await fetch('/all-data');
+            const data = await response.json();
+            displayData(data);
         };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Fetch all data from DynamoDB on page load
+            const response = await fetch('/all-data');
+            const data = await response.json();
+            displayData(data);
+        });
+
+        function displayData(data) {
+            dataDisplay.innerHTML = ''; // Clear previous data
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const tbody = document.createElement('tbody');
+
+            // Create table headers
+            const headers = Object.keys(data[0]);
+            const headerRow = document.createElement('tr');
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+
+            // Create table rows
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    td.textContent = item[header];
+                    row.appendChild(td);
+                });
+                tbody.appendChild(row);
+            });
+
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            dataDisplay.appendChild(table);
+        }
     </script>
 </body>
 
