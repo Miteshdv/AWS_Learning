@@ -8,15 +8,21 @@ sudo apt-get install -y nodejs
 # Install PM2 globally
 sudo npm install -g pm2
 
-# Set environment variables
-echo "export SNS_TOPIC_ARN=${sns_topic_arn}" >> /home/ubuntu/.bashrc
-echo "export AWS_ACCESS_KEY_ID=${aws_access_key}" >> /home/ubuntu/.bashrc
-echo "export AWS_SECRET_ACCESS_KEY=${aws_secret_key}" >> /home/ubuntu/.bashrc
+# Create .env file with environment variables
+cat <<EOL >> /home/ubuntu/.env
+SNS_TOPIC_ARN=${sns_topic_arn}
+AWS_ACCESS_KEY_ID=${aws_access_key}
+AWS_SECRET_ACCESS_KEY=${aws_secret_key}
+S3_BUCKET_NAME=${s3_bucket_name}
+DYNAMODB_TABLE_NAME=${dynamodb_table_name}
+EOL
 
 # Log environment variables
 echo "SNS_TOPIC_ARN=${sns_topic_arn}"
 echo "AWS_ACCESS_KEY_ID=${aws_access_key}"
 echo "AWS_SECRET_ACCESS_KEY=${aws_secret_key}"
+echo "S3_BUCKET_NAME=${s3_bucket_name}"
+echo "DYNAMODB_TABLE_NAME=${dynamodb_table_name}"
 
 # Create the Express server script
 cat << 'EOL' > /home/ubuntu/server.js
@@ -33,7 +39,7 @@ cd /home/ubuntu
 
 # Initialize a new Node.js project and install dependencies
 npm init -y
-npm install express aws-sdk multer axios ws
+npm install express aws-sdk multer axios ws body-parser dotenv
 
 # Stop any existing processes using port 3000 and 3001
 sudo fuser -k 3000/tcp
@@ -45,19 +51,6 @@ pm2 delete all
 # Start the Express server using PM2
 pm2 start /home/ubuntu/server.js --name server
 
-# Wait for a few seconds to allow the server to start
-sleep 10
-
-# Check if the server is running using PM2
-pm2 list
-
-# Check if the server is listening on port 3001 and log the output
-if sudo lsof -i :3001; then
-  echo "Express server is running and listening on port 3001"
-  sudo lsof -i :3001
-else
-  echo "Express server is not running or not listening on port 3001"
-fi
-
-# Check PM2 logs for the server
-pm2 logs server
+# Save the PM2 process list and have it resurrect on reboot
+pm2 save
+pm2 startup systemd -u ubuntu --hp /home/ubuntu

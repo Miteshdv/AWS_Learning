@@ -7,6 +7,10 @@ const path = require('path');
 const WebSocket = require('ws');
 const axios = require('axios');
 const bodyParser = require('body-parser');
+const dotenv = require('dotenv');
+
+// Load environment variables from .env file
+dotenv.config();
 
 const app = express();
 const port = 3001;
@@ -22,8 +26,34 @@ const sns = new AWS.SNS();
 const s3 = new AWS.S3();
 const dynamodb = new AWS.DynamoDB.DocumentClient();
 
-// SNS topic ARN
+// Environment variables
 const topicARN = process.env.SNS_TOPIC_ARN;
+const bucketName = process.env.S3_BUCKET_NAME;
+const tableName = process.env.DYNAMODB_TABLE_NAME;
+
+
+
+// Create a writable stream for logs
+const logStream = fs.createWriteStream(path.join(__dirname, 'server.log'), { flags: 'a' });
+
+// Override console methods to write to the log file
+console.log = (message, ...optionalParams) => {
+    logStream.write(`[LOG] ${new Date().toISOString()} - ${message} ${optionalParams.join(' ')}\n`);
+    process.stdout.write(`[LOG] ${new Date().toISOString()} - ${message} ${optionalParams.join(' ')}\n`);
+};
+
+console.error = (message, ...optionalParams) => {
+    logStream.write(`[ERROR] ${new Date().toISOString()} - ${message} ${optionalParams.join(' ')}\n`);
+    process.stderr.write(`[ERROR] ${new Date().toISOString()} - ${message} ${optionalParams.join(' ')}\n`);
+};
+
+// Log environment variables to verify they are set
+console.log('Environment Variables:');
+console.log('SNS_TOPIC_ARN:', topicARN);
+console.log('AWS_ACCESS_KEY_ID:', process.env.AWS_ACCESS_KEY_ID);
+console.log('AWS_SECRET_ACCESS_KEY:', process.env.AWS_SECRET_ACCESS_KEY);
+console.log('S3_BUCKET_NAME:', bucketName);
+console.log('DYNAMODB_TABLE_NAME:', tableName);
 
 // WebSocket server
 const wss = new WebSocket.Server({ noServer: true });
@@ -33,7 +63,15 @@ wss.on('connection', (ws) => {
 });
 
 // Middleware to parse JSON bodies
-app.use(bodyParser.json());
+// Use Express built-in JSON parser
+app.use(express.json({
+    type: [
+        'application/json',
+        'text/plain', // AWS sends this content-type for its messages/notifications
+    ],
+}));
+app.use(express.urlencoded({ extended: true }));
+
 
 // Function to handle incoming messages from SNS
 const handleMessage = async (message) => {
@@ -65,6 +103,8 @@ app.post('/sns', (req, res) => {
 
     if (messageType === 'SubscriptionConfirmation') {
         const subscribeUrl = req.body.SubscribeURL;
+        //console.log(`Subscription confirmation REQ : ${JSON.stringify(req)}`);
+        console.log('Subscription confirmation URL:', subscribeUrl); // Log the SubscribeURL
         axios.get(subscribeUrl)
             .then(() => {
                 console.log('Subscription confirmed');
@@ -90,20 +130,26 @@ app.get('/', (req, res) => {
 
 // API route to upload a file to S3
 app.post('/upload', upload.single('file'), (req, res) => {
+
     const fileContent = fs.readFileSync(req.file.path);
+    const fileName = req.file.originalname;
+    const fileFormat = path.extname(fileName);
+
     const params = {
-        Bucket: process.env.S3_BUCKET_NAME,
-        Key: path.basename(req.file.path),
+        Bucket: bucketName,
+        Key: fileName,
         Body: fileContent,
+        Metadata: {
+            format: fileFormat
+        }
     };
 
     s3.upload(params, (err, data) => {
         if (err) {
             console.error('Error uploading file', err);
-            res.status(500).send('Error uploading file');
+            res.status(500).send(`Error uploading file to S3: ${JSON.stringify(err)}`);
         } else {
-            console.log('File uploaded successfully', data);
-            res.status(200).send('File uploaded successfully');
+            res.status(200).send(`File uploaded successfully, ${JSON.stringify(data)}`);
         }
     });
 });
@@ -111,7 +157,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
 // API route to get data from DynamoDB
 app.get('/data', (req, res) => {
     const params = {
-        TableName: process.env.DYNAMODB_TABLE_NAME,
+        TableName: tableName,
         Key: {
             id: req.query.id,
         },
@@ -120,10 +166,29 @@ app.get('/data', (req, res) => {
     dynamodb.get(params, (err, data) => {
         if (err) {
             console.error('Error getting data from DynamoDB', err);
-            res.status(500).send('Error getting data from DynamoDB');
+            res.status(500).send(`Error getting data from DynamoDB: ${JSON.stringify(err)}`);
         } else {
-            console.log('Data retrieved successfully', data);
-            res.status(200).json(data.Item);
+            console.log('Data retrieved successfully', JSON.stringify(data));
+            res.status(200).json(data);
+        }
+    });
+});
+
+// Test route to post a message to the SNS topic
+app.post('/publish-sns', (req, res) => {
+    const message = req.body.message || 'Test message';
+    const params = {
+        Message: message,
+        TopicArn: topicARN,
+    };
+
+    sns.publish(params, (err, data) => {
+        if (err) {
+            console.error('Error publishing message to SNS', err);
+            res.status(500).send('Error publishing message to SNS');
+        } else {
+            console.log('Message published to SNS', data);
+            res.status(200).send('Message published to SNS');
         }
     });
 });
