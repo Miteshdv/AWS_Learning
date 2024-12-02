@@ -8,14 +8,18 @@ sudo apt-get install -y nodejs
 # Install PM2 globally
 sudo npm install -g pm2
 
-# Create .env file with environment variables
-cat <<EOL >> /home/ubuntu/.env
-SNS_TOPIC_ARN=${sns_topic_arn}
-AWS_ACCESS_KEY_ID=${aws_access_key}
-AWS_SECRET_ACCESS_KEY=${aws_secret_key}
-S3_BUCKET_NAME=${s3_bucket_name}
-DYNAMODB_TABLE_NAME=${dynamodb_table_name}
+# Set environment variables in a file
+cat <<EOL >> /home/ubuntu/env-vars.sh
+export SNS_TOPIC_ARN=${sns_topic_arn}
+export AWS_ACCESS_KEY_ID=${aws_access_key}
+export AWS_SECRET_ACCESS_KEY=${aws_secret_key}
+export S3_BUCKET_NAME=${s3_bucket_name}
+export DYNAMODB_TABLE_NAME=${dynamodb_table_name}
 EOL
+
+# Source the environment variables file
+echo "source /home/ubuntu/env-vars.sh" >> /home/ubuntu/.bashrc
+source /home/ubuntu/env-vars.sh
 
 # Log environment variables
 echo "SNS_TOPIC_ARN=${sns_topic_arn}"
@@ -24,14 +28,27 @@ echo "AWS_SECRET_ACCESS_KEY=${aws_secret_key}"
 echo "S3_BUCKET_NAME=${s3_bucket_name}"
 echo "DYNAMODB_TABLE_NAME=${dynamodb_table_name}"
 
+# Clone the React project repository
+git clone https://github.com/your-repo/address-info.git /home/ubuntu/address-info
+
+# Change to the project directory
+cd /home/ubuntu/address-info
+
+# Install project dependencies
+npm install
+
+# Build the React project
+npm run build
+
+# Install serve to serve the React app
+sudo npm install -g serve
+
+# Serve the React app using PM2
+pm2 serve build 3000 --name "address-info"
+
 # Create the Express server script
 cat << 'EOL' > /home/ubuntu/server.js
 ${server_js_content}
-EOL
-
-# Create the HTML file
-cat << 'EOL' > /home/ubuntu/index.html
-${index_html_content}
 EOL
 
 # Change to the home directory
@@ -41,8 +58,7 @@ cd /home/ubuntu
 npm init -y
 npm install express aws-sdk multer axios ws body-parser dotenv
 
-# Stop any existing processes using port 3000 and 3001
-sudo fuser -k 3000/tcp
+# Stop any existing processes using port 3001
 sudo fuser -k 3001/tcp
 
 # Stop any existing PM2 processes
