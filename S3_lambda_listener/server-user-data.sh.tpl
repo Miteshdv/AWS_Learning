@@ -29,7 +29,7 @@ echo "S3_BUCKET_NAME=${s3_bucket_name}"
 echo "DYNAMODB_TABLE_NAME=${dynamodb_table_name}"
 
 # Clone the React project repository
-git clone https://github.com/your-repo/address-info.git /home/ubuntu/address-info
+git clone https://github.com/Miteshdv/address-info-ui.git /home/ubuntu/address-info
 
 # Change to the project directory
 cd /home/ubuntu/address-info

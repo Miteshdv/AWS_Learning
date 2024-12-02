@@ -90,6 +90,7 @@ module "ec2" {
     aws_secret_key      = var.aws_secret_key,
     s3_bucket_name      = module.s3.bucket_name,
     dynamodb_table_name = module.dynamodb.dynamodb_table_name
+    server_js_content   = file("${path.module}/server.js")
   })
   vpc_id                      = data.aws_vpc.default.id
   subnet_id                   = data.aws_subnet.default.id
