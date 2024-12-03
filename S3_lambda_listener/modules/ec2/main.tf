@@ -1,4 +1,3 @@
-
 terraform {
   required_version = ">= 1.4.0"
   required_providers {
@@ -13,23 +12,7 @@ terraform {
   }
 }
 
-/*
-resource "aws_instance" "express_server" {
-  ami                         = var.ami
-  instance_type               = var.instance_type
-  key_name                    = var.key_name
-  iam_instance_profile        = var.iam_instance_profile
-  user_data                   = var.user_data
-  subnet_id                   = var.subnet_id
-  associate_public_ip_address = var.associate_public_ip_address
-  tags = {
-    Name = var.instance_name
-  }
-
-  vpc_security_group_ids = [aws_security_group.ec2_instance_sg.id]
-}
-*/
-
+# Data source to fetch the latest Ubuntu AMI
 data "aws_ami" "ubuntu" {
   most_recent = true
 
@@ -47,7 +30,7 @@ data "aws_ami" "ubuntu" {
   owners = ["099720109477"]
 }
 
-#tfsec:ignore:aws-ec2-enforce-launch-config-http-token-imds
+# Launch template for the EC2 instances
 resource "aws_launch_template" "apptemplate" {
   name = "application"
 
@@ -61,14 +44,12 @@ resource "aws_launch_template" "apptemplate" {
 
     tags = {
       Name = "FrontendApp"
-
     }
   }
   user_data = var.user_data
 }
 
-
-#tfsec:ignore:aws-elb-alb-not-public
+# Application Load Balancer (ALB) configuration
 resource "aws_lb" "alb1" {
   name                       = "alb1"
   internal                   = false
@@ -78,21 +59,19 @@ resource "aws_lb" "alb1" {
   drop_invalid_header_fields = true
   enable_deletion_protection = false
 
-  /*
-  access_logs {
-    bucket  = aws_s3_bucket.lb_logs.bucket
-    prefix  = "test-lb"
-    enabled = true
-  }
-  */
+  # Uncomment the following block to enable access logs
+  # access_logs {
+  #   bucket  = aws_s3_bucket.lb_logs.bucket
+  #   prefix  = "test-lb"
+  #   enabled = true
+  # }
 
   tags = {
     Environment = "Prod"
   }
 }
 
-
-
+# Target group for the ALB
 resource "aws_alb_target_group" "webserver" {
   vpc_id   = var.vpc_id
   port     = 3001
@@ -108,9 +87,7 @@ resource "aws_alb_target_group" "webserver" {
   }
 }
 
-
-
-#tfsec:ignore:aws-elb-http-not-used
+# ALB listener configuration
 resource "aws_alb_listener" "front_end" {
   load_balancer_arn = aws_lb.alb1.arn
   port              = "80"
@@ -122,6 +99,7 @@ resource "aws_alb_listener" "front_end" {
   }
 }
 
+# ALB listener rule configuration
 resource "aws_alb_listener_rule" "frontend_rule1" {
   listener_arn = aws_alb_listener.front_end.arn
   priority     = 100
@@ -138,11 +116,7 @@ resource "aws_alb_listener_rule" "frontend_rule1" {
   }
 }
 
-
-
-
-#====================================
-
+# Auto Scaling Group (ASG) configuration
 resource "aws_autoscaling_group" "asg" {
   vpc_zone_identifier = var.private_subnets
 
@@ -158,10 +132,10 @@ resource "aws_autoscaling_group" "asg" {
   }
 }
 
+# Data source to fetch information about the EC2 instances
 data "aws_instances" "application" {
   instance_tags = {
     Name = "FrontendApp"
-
   }
 
   instance_state_names = ["pending", "running"]

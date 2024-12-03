@@ -1,4 +1,3 @@
-
 # Terraform configuration block specifying the required version and providers.
 terraform {
   required_version = ">= 1.4.0"
@@ -19,6 +18,7 @@ provider "aws" {
 
 #====================================
 
+# Network module configuration.
 module "network" {
   source = "./modules/network"
 
@@ -28,11 +28,11 @@ module "network" {
 
 #====================================
 
+# Security module configuration.
 module "security" {
   source = "./modules/security"
 
   vpc_id = module.network.vpc_id
-
 
   depends_on = [
     module.network
@@ -46,13 +46,11 @@ module "s3" {
   source = "./modules/s3"
 }
 
-
+# SNS module configuration.
 module "sns" {
   source = "./modules/sns"
   name   = "address-info-sns-topic"
-
 }
-
 
 # DynamoDB module configuration with table name, hash key, and environment.
 module "dynamodb" {
@@ -72,8 +70,6 @@ module "lambda" {
   sns_topic_arn       = module.sns.arn
 }
 
-
-
 # IAM module configuration, passing S3 bucket ARN and DynamoDB table ARN.
 module "iam" {
   source             = "./modules/iam"
@@ -82,6 +78,7 @@ module "iam" {
   sns_topic_arn      = module.sns.arn
 }
 
+# EC2 module configuration, including user data for instance initialization.
 module "ec2" {
   source   = "./modules/ec2"
   key_name = var.key_name
@@ -90,7 +87,7 @@ module "ec2" {
     aws_access_key      = var.aws_access_key,
     aws_secret_key      = var.aws_secret_key,
     s3_bucket_name      = module.s3.bucket_name,
-    dynamodb_table_name = module.dynamodb.dynamodb_table_name
+    dynamodb_table_name = module.dynamodb.dynamodb_table_name,
     server_js_content   = file("${path.module}/server.js")
   }))
   instance_type   = var.app_instance_type
@@ -105,7 +102,6 @@ module "ec2" {
   ]
 }
 
-
 # AWS S3 bucket notification resource to trigger Lambda function on object creation events.
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket = module.s3.bucket_name
@@ -119,10 +115,10 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   depends_on = [module.lambda]
 }
 
+# SNS topic subscription to forward messages to the ALB endpoint.
 resource "aws_sns_topic_subscription" "alb_subscription" {
   topic_arn  = module.sns.arn
   protocol   = "http"
   endpoint   = "http://${module.ec2.dns_name}/sns"
   depends_on = [module.ec2]
 }
-
