@@ -1,4 +1,3 @@
-
 # Terraform configuration block specifying the required version and providers.
 terraform {
   required_version = ">= 1.4.0"
@@ -17,37 +16,41 @@ provider "aws" {
   secret_key = var.aws_secret_key
 }
 
-data "aws_vpc" "default" {
-  default = true
+#====================================
+
+# Network module configuration.
+module "network" {
+  source = "./modules/network"
+
+  availability_zones = var.availability_zones
+  cidr_block         = var.cidr_block
 }
 
-data "aws_subnet" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-  filter {
-    name   = "availability-zone"
-    values = ["us-west-2a"] # Replace with your desired availability zone
-  }
-  filter {
-    name   = "default-for-az"
-    values = ["true"]
-  }
+#====================================
+
+# Security module configuration.
+module "security" {
+  source = "./modules/security"
+
+  vpc_id = module.network.vpc_id
+
+  depends_on = [
+    module.network
+  ]
 }
+
+#====================================
 
 # S3 module configuration.
 module "s3" {
   source = "./modules/s3"
 }
 
-
+# SNS module configuration.
 module "sns" {
   source = "./modules/sns"
   name   = "address-info-sns-topic"
-
 }
-
 
 # DynamoDB module configuration with table name, hash key, and environment.
 module "dynamodb" {
@@ -67,8 +70,6 @@ module "lambda" {
   sns_topic_arn       = module.sns.arn
 }
 
-
-
 # IAM module configuration, passing S3 bucket ARN and DynamoDB table ARN.
 module "iam" {
   source             = "./modules/iam"
@@ -77,26 +78,29 @@ module "iam" {
   sns_topic_arn      = module.sns.arn
 }
 
+# EC2 module configuration, including user data for instance initialization.
 module "ec2" {
-  source               = "./modules/ec2"
-  ami                  = "ami-02868af3c3df4b3aa" # Replace with your desired AMI
-  instance_type        = "t2.micro"
-  key_name             = var.key_name
-  instance_name        = "ExpressServer"
-  iam_instance_profile = module.iam.instance_profile_name
-  user_data = templatefile("server-user-data.sh.tpl", {
+  source   = "./modules/ec2"
+  key_name = var.key_name
+  user_data = base64encode(templatefile("server-user-data.sh.tpl", {
     sns_topic_arn       = module.sns.arn,
     aws_access_key      = var.aws_access_key,
     aws_secret_key      = var.aws_secret_key,
     s3_bucket_name      = module.s3.bucket_name,
-    dynamodb_table_name = module.dynamodb.dynamodb_table_name
+    dynamodb_table_name = module.dynamodb.dynamodb_table_name,
     server_js_content   = file("${path.module}/server.js")
-  })
-  vpc_id                      = data.aws_vpc.default.id
-  subnet_id                   = data.aws_subnet.default.id
-  associate_public_ip_address = true
+  }))
+  instance_type   = var.app_instance_type
+  vpc_id          = module.network.vpc_id
+  public_subnets  = module.network.public_subnets
+  private_subnets = module.network.private_subnets
+  webserver_sg_id = module.security.application_sg_id
+  alb_sg_id       = module.security.alb_sg_id
+  depends_on = [
+    module.network,
+    module.security
+  ]
 }
-
 
 # AWS S3 bucket notification resource to trigger Lambda function on object creation events.
 resource "aws_s3_bucket_notification" "bucket_notification" {
@@ -111,10 +115,10 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   depends_on = [module.lambda]
 }
 
-resource "aws_sns_topic_subscription" "http_subscription" {
+# SNS topic subscription to forward messages to the ALB endpoint.
+resource "aws_sns_topic_subscription" "alb_subscription" {
   topic_arn  = module.sns.arn
   protocol   = "http"
-  endpoint   = "http://${module.ec2.public_ip}:3001/sns"
+  endpoint   = "http://${module.ec2.dns_name}/sns"
   depends_on = [module.ec2]
 }
-

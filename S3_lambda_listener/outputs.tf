@@ -11,3 +11,8 @@ output "sns_urn" {
 }
 
 
+output "alb_dns_name" {
+  value = module.ec2.dns_name
+}
+
+
