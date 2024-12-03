@@ -35,7 +35,7 @@ git clone https://github.com/Miteshdv/address-info-ui.git /home/ubuntu/address-i
 cd /home/ubuntu/address-info
 
 # Install project dependencies
-npm install
+npm install --force
 
 # Build the React project
 npm run build
