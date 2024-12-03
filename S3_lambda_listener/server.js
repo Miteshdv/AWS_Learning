@@ -24,7 +24,7 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from the React app build directory
-app.use(express.static(path.join(__dirname, 'address-info/build')));
+app.use(express.static(path.join(__dirname, 'address-info/dist')));
 
 // Configure AWS SDK
 AWS.config.update({
@@ -183,7 +183,7 @@ app.get('/all-data', (req, res) => {
 
 // Catch-all route to serve the React app
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'address-info/build', 'index.html'));
+    res.sendFile(path.join(__dirname, 'address-info/dist', 'index.html'));
 });
 
 // Start the server
