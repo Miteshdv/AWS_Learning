@@ -17,24 +17,29 @@ provider "aws" {
   secret_key = var.aws_secret_key
 }
 
-data "aws_vpc" "default" {
-  default = true
+#====================================
+
+module "network" {
+  source = "./modules/network"
+
+  availability_zones = var.availability_zones
+  cidr_block         = var.cidr_block
 }
 
-data "aws_subnet" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-  filter {
-    name   = "availability-zone"
-    values = ["us-west-2a"] # Replace with your desired availability zone
-  }
-  filter {
-    name   = "default-for-az"
-    values = ["true"]
-  }
+#====================================
+
+module "security" {
+  source = "./modules/security"
+
+  vpc_id = module.network.vpc_id
+
+
+  depends_on = [
+    module.network
+  ]
 }
+
+#====================================
 
 # S3 module configuration.
 module "s3" {
@@ -78,23 +83,26 @@ module "iam" {
 }
 
 module "ec2" {
-  source               = "./modules/ec2"
-  ami                  = "ami-02868af3c3df4b3aa" # Replace with your desired AMI
-  instance_type        = "t2.micro"
-  key_name             = var.key_name
-  instance_name        = "ExpressServer"
-  iam_instance_profile = module.iam.instance_profile_name
-  user_data = templatefile("server-user-data.sh.tpl", {
+  source   = "./modules/ec2"
+  key_name = var.key_name
+  user_data = base64encode(templatefile("server-user-data.sh.tpl", {
     sns_topic_arn       = module.sns.arn,
     aws_access_key      = var.aws_access_key,
     aws_secret_key      = var.aws_secret_key,
     s3_bucket_name      = module.s3.bucket_name,
     dynamodb_table_name = module.dynamodb.dynamodb_table_name
     server_js_content   = file("${path.module}/server.js")
-  })
-  vpc_id                      = data.aws_vpc.default.id
-  subnet_id                   = data.aws_subnet.default.id
-  associate_public_ip_address = true
+  }))
+  instance_type   = var.app_instance_type
+  vpc_id          = module.network.vpc_id
+  public_subnets  = module.network.public_subnets
+  private_subnets = module.network.private_subnets
+  webserver_sg_id = module.security.application_sg_id
+  alb_sg_id       = module.security.alb_sg_id
+  depends_on = [
+    module.network,
+    module.security
+  ]
 }
 
 
@@ -111,10 +119,10 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   depends_on = [module.lambda]
 }
 
-resource "aws_sns_topic_subscription" "http_subscription" {
+resource "aws_sns_topic_subscription" "alb_subscription" {
   topic_arn  = module.sns.arn
   protocol   = "http"
-  endpoint   = "http://${module.ec2.public_ip}:3001/sns"
+  endpoint   = "http://${module.ec2.dns_name}/sns"
   depends_on = [module.ec2]
 }
 
