@@ -2,6 +2,10 @@
 
 This project sets up the necessary AWS resources using Terraform. The resources include VPC, subnets, security groups, S3 bucket, SNS topic, DynamoDB table, Lambda function, IAM roles and policies, EC2 instances, and an Application Load Balancer (ALB).
 
+Here is working app- S3 -  [Dynamo Updater](http://alb1-618909001.us-west-2.elb.amazonaws.com/s)
+
+
+
 ## Prerequisites
 
 - [Terraform](https://www.terraform.io/downloads.html) installed
