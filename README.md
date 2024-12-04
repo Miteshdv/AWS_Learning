@@ -33,8 +33,11 @@ terraform apply
 
 ```
 ### Architecure Diagram
+Simplified Diagram
+<img alt="Brainboard - AWS" src="./Brainboard - AWS Learning Simple.png">
+
 This diagram represents the AWS architecture set up by this Terraform configuration.
-<img alt="Brainboard - AWS" src="./S3_lambda_listener/Brainboard - AWS Board.png">
+<img alt="Brainboard - AWS" src="./Brainboard - AWS Board.png">
 
 
 
