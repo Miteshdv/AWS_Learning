@@ -10,18 +10,18 @@ This project sets up the necessary AWS resources using Terraform. The resources 
 ## Instructions
 
 ### 1. Terraform Initialization
-Add  terraform.tfvars
+Add a file named `terraform.tfvars` with the following content:
+
+```plaintext
 availability_zones    = ["us-west-2a", "us-west-2b"]
 cidr_block            = "10.0.0.0/16"
 bastion_instance_type = "t3.micro"
 app_instance_type     = "t3.micro"
 db_instance_type      = "t3.micro"
-
-
-key_name       =  YOUR KEY PAIR NAME
-aws_access_key =  YOUR ACCESS KEY
-aws_secret_key =  YOUR SECRET KEY
-
+key_name              = "YOUR KEY PAIR NAME"
+aws_access_key        = "YOUR ACCESS KEY"
+aws_secret_key        = "YOUR SECRET KEY"
+```
 Initialize the Terraform configuration by running the following command:
 
 ```sh
@@ -34,7 +34,7 @@ terraform apply
 ```
 ### Architecure Diagram
 This diagram represents the AWS architecture set up by this Terraform configuration.
-<img alt="Brainboard - AWS" src="../S3_lambda_listener/Brainboard - AWS Board.png">
+<img alt="Brainboard - AWS" src="./S3_lambda_listener/Brainboard - AWS Board.png">
 
 
 
